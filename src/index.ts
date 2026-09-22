@@ -14,9 +14,8 @@ db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TE
 
 function admin(ctx: Context) { return !!ctx.from && admins.has(ctx.from.id); }
 function codes(text: string) {
-  const codeLine = text.match(/(?:^|\\n)\\s*code\\s*:\\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i);
-  if (codeLine) return [codeLine[1].toUpperCase()];
-  return [];
+  const match = text.match(/code\\s*:\\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i);
+  return match ? [match[1].toUpperCase()] : [];
 }
 async function submit(ctx: Context, text: string) {
   if (!ctx.from) return;
