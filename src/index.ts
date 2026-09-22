@@ -10,30 +10,34 @@ const admins = new Set((process.env.ADMIN_USER_IDS ?? "").split(",").map(Number)
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
-db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, source TEXT NOT NULL, submitted_by INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', redeemed_by INTEGER, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, source TEXT NOT NULL, submitted_by INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', redeemed_by INTEGER, value TEXT, wager TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+for (const column of ["value", "wager"]) { try { db.exec("ALTER TABLE promo_codes ADD COLUMN " + column + " TEXT"); } catch {} }
 
 function admin(ctx: Context) { return !!ctx.from && admins.has(ctx.from.id); }
-function codes(text: string) {
-  const match = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i);
-  return match ? [match[1].toUpperCase()] : [];
+function details(text: string) {
+  const code = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i)?.[1]?.toUpperCase();
+  const value = text.match(/value\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
+  const wager = text.match(/(?:7[- ]day\s+)?wager\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
+  return code ? { code, value: value ?? null, wager: wager ?? null } : null;
 }
 async function submit(ctx: Context, text: string) {
   if (!ctx.from) return;
-  const found = codes(text);
-  if (!found.length) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
-  const out: string[] = [];
-  for (const code of found) {
-    try { db.prepare("INSERT INTO promo_codes (code, source, submitted_by) VALUES (?, ?, ?)").run(code, text.slice(0, 4000), ctx.from.id); out.push("✅ " + code + " — pending approval"); }
-    catch { out.push("ℹ️ " + code + " — already submitted"); }
+  const found = details(text);
+  if (!found) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
+  try {
+    db.prepare("INSERT INTO promo_codes (code, source, submitted_by, value, wager) VALUES (?, ?, ?, ?, ?)").run(found.code, text.slice(0, 4000), ctx.from.id, found.value, found.wager);
+    const extra = [found.value ? "Value: " + found.value : null, found.wager ? "Wager: " + found.wager : null].filter(Boolean).join(" | ");
+    await ctx.reply("✅ " + found.code + " — pending approval" + (extra ? "\n" + extra : ""));
+  } catch {
+    await ctx.reply("ℹ️ " + found.code + " — already submitted");
   }
-  await ctx.reply(out.join("\\n"));
 }
 const bot = new Bot(token);
 bot.command("start", ctx => ctx.reply("Forward a promo-code post here. Use /codes to view approved codes."));
 bot.command("codes", async ctx => {
   const q = ctx.match.trim().toUpperCase();
-  const rows = db.prepare("SELECT id, code FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string}[];
-  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code).join("\\n") : "No approved codes found.");
+  const rows = db.prepare("SELECT id, code, value, wager FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string;value:string|null;wager:string|null}[];
+  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code + (r.value ? "\nValue: " + r.value : "") + (r.wager ? "\nWager: " + r.wager : "")).join("\n") : "No approved codes found.");
 });
 bot.command("pending", async ctx => {
   if (!admin(ctx)) return void await ctx.reply("Admin access is required.");
