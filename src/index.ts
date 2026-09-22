@@ -12,6 +12,7 @@ const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
 const destinationChatIds = new Set((process.env.DESTINATION_CHAT_IDS ?? process.env.DESTINATION_CHAT_ID ?? "2312794442").split(",").map(Number).filter(Number.isInteger));
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
+db.exec("CREATE TABLE IF NOT EXISTS drop_alert_subscribers (chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, display_name TEXT NOT NULL, PRIMARY KEY (chat_id, user_id))");
 db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, source TEXT NOT NULL, submitted_by INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', redeemed_by INTEGER, value TEXT, wager TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
 for (const column of ["value", "wager"]) { try { db.exec("ALTER TABLE promo_codes ADD COLUMN " + column + " TEXT"); } catch {} }
 
@@ -42,6 +43,23 @@ function codeKeyboard(rows: { id: number; code: string }[]) {
 const bot = new Bot(token);
 bot.command("start", ctx => ctx.reply("Forward a promo-code post here. Use /codes to view approved codes."));
 bot.command("chatid", ctx => ctx.reply("Chat ID: " + ctx.chat.id));
+bot.command("alerts", async ctx => {
+  if (!destinationChatIds.has(ctx.chat.id)) return;
+  await ctx.reply("Don’t worry—I’m here to stay, unlike the other guy.\n\nTap the button below and I’ll tag you whenever a new Thrill code drops in this group. Tap it again anytime to unsubscribe.", { reply_markup: new InlineKeyboard().text("Tag me on drops", "toggle_drop_alerts") });
+});
+bot.callbackQuery("toggle_drop_alerts", async ctx => {
+  if (!ctx.from || !destinationChatIds.has(ctx.chat?.id ?? 0)) return void await ctx.answerCallbackQuery({ text: "Alerts are only available in the drop groups." });
+  const existing = db.prepare("SELECT 1 FROM drop_alert_subscribers WHERE chat_id=? AND user_id=?").get(ctx.chat.id, ctx.from.id);
+  if (existing) {
+    db.prepare("DELETE FROM drop_alert_subscribers WHERE chat_id=? AND user_id=?").run(ctx.chat.id, ctx.from.id);
+    await ctx.answerCallbackQuery({ text: "Drop alerts turned off." });
+  } else {
+    const displayName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") || ctx.from.username || "Member";
+    db.prepare("INSERT OR REPLACE INTO drop_alert_subscribers (chat_id,user_id,display_name) VALUES (?,?,?)").run(ctx.chat.id, ctx.from.id, displayName);
+    await ctx.answerCallbackQuery({ text: "You’ll be tagged on new drops." });
+  }
+});
+
 bot.command("codes", async ctx => {
   const q = ctx.match.trim().toUpperCase();
   const rows = db.prepare("SELECT id, code, value, wager FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string;value:string|null;wager:string|null}[];
