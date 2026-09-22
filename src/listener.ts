@@ -3,8 +3,6 @@ import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { NewMessage } from "telegram/events";
 import { Api } from "telegram";
-import fetch from "node-fetch";
-
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const session = process.env.TELEGRAM_SESSION;
