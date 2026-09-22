@@ -31,7 +31,7 @@ if (!apiId || !apiHash || !session || !botToken) {
       await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: body, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: code, copy_text: { text: code } }]] } })
+        body: JSON.stringify({ chat_id: chatId, text: body, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: "⚡️ Claim the drop: " + code, copy_text: { text: code } }]] } })
       });
     }
     console.log("Forwarded code " + code + " from monitored channel");
