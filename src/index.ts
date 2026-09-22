@@ -14,31 +14,32 @@ db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TE
 
 function admin(ctx: Context) { return !!ctx.from && admins.has(ctx.from.id); }
 function codes(text: string) {
-  const ignored = new Set(["PROMO", "CODE", "CODES", "BONUS", "THRILL", "TELEGRAM"]);
-  return [...new Set((text.match(/\b[A-Z0-9][A-Z0-9_-]{3,31}\b/gi) ?? []).map(x => x.toUpperCase()).filter(x => !ignored.has(x)))];
+  const codeLine = text.match(/(?:^|\\n)\\s*code\\s*:\\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i);
+  if (codeLine) return [codeLine[1].toUpperCase()];
+  return [];
 }
 async function submit(ctx: Context, text: string) {
   if (!ctx.from) return;
   const found = codes(text);
-  if (!found.length) return void await ctx.reply("I couldn't find a likely promo code.");
+  if (!found.length) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
   const out: string[] = [];
   for (const code of found) {
     try { db.prepare("INSERT INTO promo_codes (code, source, submitted_by) VALUES (?, ?, ?)").run(code, text.slice(0, 4000), ctx.from.id); out.push("✅ " + code + " — pending approval"); }
     catch { out.push("ℹ️ " + code + " — already submitted"); }
   }
-  await ctx.reply(out.join("\n"));
+  await ctx.reply(out.join("\\n"));
 }
 const bot = new Bot(token);
 bot.command("start", ctx => ctx.reply("Forward a promo-code post here. Use /codes to view approved codes."));
 bot.command("codes", async ctx => {
   const q = ctx.match.trim().toUpperCase();
   const rows = db.prepare("SELECT id, code FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string}[];
-  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code).join("\n") : "No approved codes found.");
+  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code).join("\\n") : "No approved codes found.");
 });
 bot.command("pending", async ctx => {
   if (!admin(ctx)) return void await ctx.reply("Admin access is required.");
   const rows = db.prepare("SELECT id, code, submitted_by FROM promo_codes WHERE status='pending' ORDER BY id").all() as {id:number;code:string;submitted_by:number}[];
-  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code + " — user " + r.submitted_by).join("\n") : "No pending submissions.");
+  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code + " — user " + r.submitted_by).join("\\n") : "No pending submissions.");
 });
 for (const action of ["approve", "reject"] as const) bot.command(action, async ctx => {
   if (!admin(ctx)) return void await ctx.reply("Admin access is required.");
