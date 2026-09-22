@@ -1,3 +1,4 @@
+import "./listener.js";
 import "dotenv/config";
 import Database from "better-sqlite3";
 import { Bot, Context, InlineKeyboard } from "grammy";
