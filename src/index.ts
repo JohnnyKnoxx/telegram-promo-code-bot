@@ -1,6 +1,6 @@
 import "dotenv/config";
 import Database from "better-sqlite3";
-import { Bot, Context } from "grammy";
+import { Bot, Context, InlineKeyboard } from "grammy";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -32,12 +32,18 @@ async function submit(ctx: Context, text: string) {
     await ctx.reply("ℹ️ " + found.code + " — already submitted");
   }
 }
+function codeKeyboard(rows: { id: number; code: string }[]) {
+  const keyboard = new InlineKeyboard();
+  for (const row of rows) keyboard.text("📋 Copy " + row.code, { copy_text: { text: row.code } }).row();
+  return keyboard;
+}
 const bot = new Bot(token);
 bot.command("start", ctx => ctx.reply("Forward a promo-code post here. Use /codes to view approved codes."));
 bot.command("codes", async ctx => {
   const q = ctx.match.trim().toUpperCase();
   const rows = db.prepare("SELECT id, code, value, wager FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string;value:string|null;wager:string|null}[];
-  await ctx.reply(rows.length ? rows.map(r => "#" + r.id + " — " + r.code + (r.value ? "\nValue: " + r.value : "") + (r.wager ? "\nWager: " + r.wager : "")).join("\n") : "No approved codes found.");
+  if (!rows.length) return void await ctx.reply("No approved codes found.");
+  await ctx.reply(rows.map(r => "#" + r.id + " — " + r.code + (r.value ? "\nValue: " + r.value : "") + (r.wager ? "\nWager: " + r.wager : "")).join("\n"), { reply_markup: codeKeyboard(rows) });
 });
 bot.command("pending", async ctx => {
   if (!admin(ctx)) return void await ctx.reply("Admin access is required.");
