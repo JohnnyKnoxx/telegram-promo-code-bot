@@ -8,6 +8,7 @@ const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN is required");
 const admins = new Set((process.env.ADMIN_USER_IDS ?? "").split(",").map(Number).filter(Number.isInteger));
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
+const destinationChatId = Number(process.env.DESTINATION_CHAT_ID ?? "2312794442");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, source TEXT NOT NULL, submitted_by INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', redeemed_by INTEGER, value TEXT, wager TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
@@ -21,7 +22,7 @@ function details(text: string) {
   return code ? { code, value: value ?? null, wager: wager ?? null } : null;
 }
 async function submit(ctx: Context, text: string) {
-  if (!ctx.from) return;
+  if (!ctx.from || ctx.chat?.id === destinationChatId) return;
   const found = details(text);
   if (!found) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
   try {
