@@ -22,13 +22,16 @@ if (!apiId || !apiHash || !session || !botToken) {
     if (!code) return;
     const value = text.match(/value\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
     const wager = text.match(/(?:7[- ]day\s+)?wager\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
+    const loss = text.match(/(?:7[- ]day\s+)?loss\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
+    const claims = text.match(/claims\s*:\s*([\d,.]+)/i)?.[1];
+    const valid = text.match(/valid\s+till\s*:\s*([^\\n]+)/i)?.[1]?.trim();
     const body = "🎁 <b>New Thrill promo code</b>\n\n<code>" + code + "</code>" +
       (value ? "\nValue: " + value : "") + (wager ? "\nWager: " + wager : "");
     for (const chatId of destinations) {
       await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: body, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: "📋 Copy code", copy_text: { text: code } }]] } })
+        body: JSON.stringify({ chat_id: chatId, text: body, parse_mode: "HTML", reply_markup: { inline_keyboard: [[{ text: code, copy_text: { text: code } }]] } })
       });
     }
     console.log("Forwarded code " + code + " from monitored channel");
