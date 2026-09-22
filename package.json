@@ -12,7 +12,8 @@
     "better-sqlite3": "^11.8.1",
     "dotenv": "^16.4.7",
     "grammy": "^1.35.0",
-    "telegram": "^2.26.22"
+    "telegram": "^2.26.22",
+    "input": "^1.0.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
