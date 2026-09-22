@@ -40,6 +40,7 @@ function codeKeyboard(rows: { id: number; code: string }[]) {
 }
 const bot = new Bot(token);
 bot.command("start", ctx => ctx.reply("Forward a promo-code post here. Use /codes to view approved codes."));
+bot.command("chatid", ctx => ctx.reply("Chat ID: " + ctx.chat.id));
 bot.command("codes", async ctx => {
   const q = ctx.match.trim().toUpperCase();
   const rows = db.prepare("SELECT id, code, value, wager FROM promo_codes WHERE status='approved' AND code LIKE ? ORDER BY id DESC LIMIT 30").all("%" + q + "%") as {id:number;code:string;value:string|null;wager:string|null}[];
