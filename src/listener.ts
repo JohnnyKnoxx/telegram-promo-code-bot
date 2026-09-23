@@ -32,6 +32,9 @@ if (!apiId || !apiHash || !session || !botToken) {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 5 });
   await client.connect();
 
+  const sourceEntities = await Promise.all(sources.map(source => client.getEntity(source)));
+  console.log("Resolved source channels: " + sourceEntities.map((entity, index) => sources[index] + "=" + String(entity)).join(", "));
+
   client.addEventHandler(async event => {
     const text = event.message.message ?? "";
     const code = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i)?.[1]?.toUpperCase();
@@ -43,9 +46,8 @@ if (!apiId || !apiHash || !session || !botToken) {
     const claims = text.match(/claims\s*:\s*([\d,.]+)/i)?.[1];
 
     try {
-      db.prepare(
-        "INSERT INTO promo_codes (code, source, submitted_by, status, value, wager) VALUES (?, ?, ?, 'approved', ?, ?)"
-      ).run(code, text.slice(0, 4000), 0, value ?? null, wager ?? null);
+      db.prepare("INSERT INTO promo_codes (code, source, submitted_by, status, value, wager) VALUES (?, ?, ?, 'approved', ?, ?)")
+        .run(code, text.slice(0, 4000), 0, value ?? null, wager ?? null);
     } catch {
       console.log("Skipped duplicate code " + code);
       return;
@@ -75,7 +77,7 @@ if (!apiId || !apiHash || !session || !botToken) {
     }
 
     console.log("Saved and forwarded approved code " + code);
-  }, new NewMessage({ chats: sources }));
+  }, new NewMessage({ chats: sourceEntities }));
 
   console.log("Channel listener active for " + sources.join(", "));
 }
