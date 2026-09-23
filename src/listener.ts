@@ -38,7 +38,7 @@ if (!apiId || !apiHash || !session || !botToken) {
 
   client.addEventHandler(async event => {
     const text = event.message.message ?? "";
-    const code = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i)?.[1]?.toUpperCase();
+    const code = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i)?.[1];
     if (!code) return;
 
     const value = text.match(/value\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
