@@ -11,7 +11,8 @@ const apiHash = process.env.TELEGRAM_API_HASH;
 const session = process.env.TELEGRAM_SESSION;
 const botToken = process.env.BOT_TOKEN;
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
-const sources = (process.env.SOURCE_CHANNELS ?? "@thrilldrops,@Thrillcom,3085902874").split(",").map(s => s.trim()).filter(Boolean);
+const rawSources = (process.env.SOURCE_CHANNELS ?? "@thrilldrops,@Thrillcom,3085902874").split(",").map(s => s.trim()).filter(Boolean);
+const sources = rawSources.map(source => /^\d+$/.test(source) ? "-100" + source : source);
 const destinations = (process.env.DESTINATION_CHAT_IDS ?? "-1002312794442,-1003653622779").split(",").map(Number).filter(Number.isInteger);
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -33,7 +34,7 @@ if (!apiId || !apiHash || !session || !botToken) {
   await client.connect();
 
   const sourceEntities = await Promise.all(sources.map(source => client.getEntity(source)));
-  console.log("Resolved source channels: " + sourceEntities.map((entity, index) => sources[index] + "=" + String(entity)).join(", "));
+  console.log("Resolved source channels: " + sources.join(", "));
 
   client.addEventHandler(async event => {
     const text = event.message.message ?? "";
