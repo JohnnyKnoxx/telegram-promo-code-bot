@@ -78,7 +78,7 @@ if (!apiId || !apiHash || !session || !botToken) {
     }
 
     console.log("Saved and forwarded approved code " + code);
-  }, new NewMessage({ chats: sourceEntities }));
+  }, new NewMessage({ chats: sources }));
 
   console.log("Channel listener active for " + sources.join(", "));
 }
