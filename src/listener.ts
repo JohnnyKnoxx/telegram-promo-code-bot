@@ -16,6 +16,10 @@ const destinations = (process.env.DESTINATION_CHAT_IDS ?? "-1002312794442,-10036
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
+db.exec("CREATE TABLE IF NOT EXISTS promo_codes (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, source TEXT NOT NULL, submitted_by INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', redeemed_by INTEGER, value TEXT, wager TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+for (const column of ["value", "wager"]) {
+  try { db.exec("ALTER TABLE promo_codes ADD COLUMN " + column + " TEXT"); } catch {}
+}
 db.exec("CREATE TABLE IF NOT EXISTS drop_alert_subscribers (chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, display_name TEXT NOT NULL, PRIMARY KEY (chat_id, user_id))");
 
 function escapeHtml(value: string) {
@@ -27,14 +31,26 @@ if (!apiId || !apiHash || !session || !botToken) {
 } else {
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 5 });
   await client.connect();
+
   client.addEventHandler(async event => {
     const text = event.message.message ?? "";
     const code = text.match(/code\s*:\s*([A-Za-z0-9][A-Za-z0-9_-]{3,31})/i)?.[1]?.toUpperCase();
     if (!code) return;
+
     const value = text.match(/value\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
     const wager = text.match(/(?:7[- ]day\s+)?wager\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
     const loss = text.match(/(?:7[- ]day\s+)?loss\s*:\s*([$€£]?\s?[\d,.]+)/i)?.[1]?.replace(/\s+/g, "");
     const claims = text.match(/claims\s*:\s*([\d,.]+)/i)?.[1];
+
+    try {
+      db.prepare(
+        "INSERT INTO promo_codes (code, source, submitted_by, status, value, wager) VALUES (?, ?, ?, 'approved', ?, ?)"
+      ).run(code, text.slice(0, 4000), 0, value ?? null, wager ?? null);
+    } catch {
+      console.log("Skipped duplicate code " + code);
+      return;
+    }
+
     const body = "🔥 <b>THRILL DROP</b>" +
       (value ? "\n\n<b>Value:</b> " + value : "") +
       (claims ? "\n<b>Claims:</b> " + claims : "") +
@@ -45,6 +61,7 @@ if (!apiId || !apiHash || !session || !botToken) {
       const rows = db.prepare("SELECT user_id, display_name FROM drop_alert_subscribers WHERE chat_id=?").all(chatId) as { user_id: number; display_name: string }[];
       const mentions = rows.map(row => '<a href="tg://user?id=' + row.user_id + '">' + escapeHtml(row.display_name) + "</a>").join(" ");
       const tagLine = mentions ? "\n\n🔔 " + mentions : "";
+
       await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -56,7 +73,9 @@ if (!apiId || !apiHash || !session || !botToken) {
         })
       });
     }
-    console.log("Forwarded code " + code + " from monitored channel");
+
+    console.log("Saved and forwarded approved code " + code);
   }, new NewMessage({ chats: sources }));
+
   console.log("Channel listener active for " + sources.join(", "));
 }
