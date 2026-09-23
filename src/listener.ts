@@ -11,8 +11,8 @@ const apiHash = process.env.TELEGRAM_API_HASH;
 const session = process.env.TELEGRAM_SESSION;
 const botToken = process.env.BOT_TOKEN;
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
-const rawSources = (process.env.SOURCE_CHANNELS ?? "@thrilldrops,@Thrillcom,3085902874").split(",").map(s => s.trim()).filter(Boolean);
-const sources = rawSources.map(source => /^\d+$/.test(source) ? "-100" + source : source);
+const rawSources = (process.env.SOURCE_CHANNELS ?? "@thrilldrops,@Thrillcom").split(",").map(s => s.trim()).filter(Boolean);
+const sources = rawSources.filter(source => source !== "3085902874" && source !== "-1003085902874");
 const destinations = (process.env.DESTINATION_CHAT_IDS ?? "-1002312794442,-1003653622779").split(",").map(Number).filter(Number.isInteger);
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
