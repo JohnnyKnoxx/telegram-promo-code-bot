@@ -13,3 +13,9 @@ export function resolveDestinationChatIds(configured: string): number[] {
     .filter(id => Number.isSafeInteger(id) && id !== 0);
   return [...new Set([...existing, ABCKNOX_CHAT_ID])];
 }
+
+/** Only direct private conversations may submit a code for manual review.
+ * In particular, groups not yet present in DESTINATION_CHAT_IDS must stay silent. */
+export function acceptsManualPromoSubmission(chatType: string | undefined): boolean {
+  return chatType === "private";
+}

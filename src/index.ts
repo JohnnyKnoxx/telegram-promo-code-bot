@@ -1,5 +1,5 @@
 import "./listener.js";
-import { resolveDestinationChatIds } from "./destination-chats.js";
+import { acceptsManualPromoSubmission, resolveDestinationChatIds } from "./destination-chats.js";
 import "dotenv/config";
 import Database from "better-sqlite3";
 import { Bot, Context, InlineKeyboard } from "grammy";
@@ -25,7 +25,9 @@ function details(text: string) {
   return code ? { code, value: value ?? null, wager: wager ?? null } : null;
 }
 async function submit(ctx: Context, text: string) {
-  if (!ctx.from || destinationChatIds.has(ctx.chat?.id ?? 0)) return;
+  // Ordinary group conversation must never be treated as a promo submission.
+  // Group commands (/chatid, /alerts) remain handled by their own routes.
+  if (!ctx.from || !acceptsManualPromoSubmission(ctx.chat?.type)) return;
   const found = details(text);
   if (!found) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
   try {
