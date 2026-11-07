@@ -1,4 +1,5 @@
 import "./listener.js";
+import { acceptsManualPromoSubmission, resolveDestinationChatIds } from "./destination-chats.js";
 import "dotenv/config";
 import Database from "better-sqlite3";
 import { Bot, Context, InlineKeyboard } from "grammy";
@@ -9,7 +10,7 @@ const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN is required");
 const admins = new Set((process.env.ADMIN_USER_IDS ?? "").split(",").map(Number).filter(Number.isInteger));
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
-const destinationChatIds = new Set((process.env.DESTINATION_CHAT_IDS ?? process.env.DESTINATION_CHAT_ID ?? "2312794442").split(",").map(Number).filter(Number.isInteger));
+const destinationChatIds = new Set(resolveDestinationChatIds(process.env.DESTINATION_CHAT_IDS ?? process.env.DESTINATION_CHAT_ID ?? "2312794442"));
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 db.exec("CREATE TABLE IF NOT EXISTS drop_alert_subscribers (chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, display_name TEXT NOT NULL, PRIMARY KEY (chat_id, user_id))");
@@ -24,7 +25,9 @@ function details(text: string) {
   return code ? { code, value: value ?? null, wager: wager ?? null } : null;
 }
 async function submit(ctx: Context, text: string) {
-  if (!ctx.from || destinationChatIds.has(ctx.chat?.id ?? 0)) return;
+  // Ordinary group conversation must never be treated as a promo submission.
+  // Group commands (/chatid, /alerts) remain handled by their own routes.
+  if (!ctx.from || !acceptsManualPromoSubmission(ctx.chat?.type)) return;
   const found = details(text);
   if (!found) return void await ctx.reply("I couldn't find a promo code. Look for a line like Code: ABC123.");
   try {
