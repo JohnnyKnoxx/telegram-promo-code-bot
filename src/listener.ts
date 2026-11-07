@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { resolveDestinationChatIds } from "./destination-chats.js";
 import Database from "better-sqlite3";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
@@ -13,7 +14,7 @@ const botToken = process.env.BOT_TOKEN;
 const dbPath = process.env.DATABASE_PATH ?? "./data/promo-codes.db";
 const rawSources = (process.env.SOURCE_CHANNELS ?? "@thrilldrops,@Thrillcom").split(",").map(s => s.trim()).filter(Boolean);
 const sources = rawSources.filter(source => source !== "3085902874" && source !== "-1003085902874");
-const destinations = (process.env.DESTINATION_CHAT_IDS ?? "-1002312794442,-1003653622779").split(",").map(Number).filter(Number.isInteger);
+const destinations = resolveDestinationChatIds(process.env.DESTINATION_CHAT_IDS ?? "-1002312794442,-1003653622779");
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
@@ -60,24 +61,34 @@ if (!apiId || !apiHash || !session || !botToken) {
       (wager ? "\n<b>7-Day Wager:</b> " + wager : "") +
       (loss ? "\n<b>7-Day Loss:</b> " + loss : "");
 
+    let delivered = 0;
     for (const chatId of destinations) {
       const rows = db.prepare("SELECT user_id, display_name FROM drop_alert_subscribers WHERE chat_id=?").all(chatId) as { user_id: number; display_name: string }[];
       const mentions = rows.map(row => '<a href="tg://user?id=' + row.user_id + '">' + escapeHtml(row.display_name) + "</a>").join(" ");
       const tagLine = mentions ? "\n\n🔔 " + mentions : "";
 
-      await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: body + tagLine,
-          parse_mode: "HTML",
-          reply_markup: { inline_keyboard: [[{ text: code, copy_text: { text: code } }]] }
-        })
-      });
+      try {
+        const result = await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: body + tagLine,
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard: [[{ text: code, copy_text: { text: code } }]] }
+          })
+        });
+        if (result.ok) {
+          delivered += 1;
+        } else {
+          console.error("Promo code delivery failed for chat " + chatId + " (Telegram HTTP " + result.status + ").");
+        }
+      } catch {
+        console.error("Promo code delivery failed for chat " + chatId + " (network error).");
+      }
     }
 
-    console.log("Saved and forwarded approved code " + code);
+    console.log("Processed approved code: " + delivered + "/" + destinations.length + " destination deliveries acknowledged.");
   }, new NewMessage({ chats: sources }));
 
   console.log("Channel listener active for " + sources.join(", "));
