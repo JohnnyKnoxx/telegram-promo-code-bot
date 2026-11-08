@@ -1,10 +1,10 @@
 /**
  * Group destination expansion shared by the Telegram bot and the source listener.
- * Telegram supergroup Bot API chat IDs use a -100 prefix. ABCKNOX's supplied
- * numeric identifier was 5271704394, giving -1005271704394 for a supergroup.
+ * Telegram supergroup Bot API chat IDs use a -100 prefix. ABCKNOX's own /chatid reply gave the signed ID -5271704394.
+ * Never guess a -100 prefix from an unsigned suffix.
  * Keep every preconfigured destination; append only the new group and dedupe.
  */
-export const ABCKNOX_CHAT_ID = -1005271704394;
+export const ABCKNOX_CHAT_ID = -5271704394;
 
 export function resolveDestinationChatIds(configured: string): number[] {
   const existing = configured
